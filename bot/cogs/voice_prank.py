@@ -4,10 +4,16 @@ import asyncio
 import random
 import threading
 import time
+from pathlib import Path
 
 import discord
 from discord import app_commands
 from discord.ext import commands, voice_recv
+
+from bot.config import config
+
+
+LEAVE_STYLE_SONG = Path(__file__).parents[2] / "Sounds" / "outro-song_oqu8zAg.mp3"
 
 
 class AutoPrankSink(voice_recv.AudioSink):
@@ -69,6 +75,7 @@ class VoicePrank(commands.Cog):
         self.bot = bot
         self.auto_sessions: dict[int, AutoPrankSink] = {}
         self.text_prank_targets: dict[int, int] = {}
+        self.leave_style_tasks: dict[int, asyncio.Task] = {}
 
     @app_commands.command(name="sound", description="Play a sound from this server's soundboard")
     @app_commands.describe(sound="Choose a soundboard sound")
@@ -210,6 +217,74 @@ class VoicePrank(commands.Cog):
         await interaction.response.send_message(
             f"Text prank mode is now on for {user.display_name} (ID: {user.id})."
         )
+
+    @app_commands.command(name="leaveinstyle", description="Play the leave song, then clear the voice channel")
+    async def leaveinstyle(self, interaction: discord.Interaction):
+        if not interaction.guild:
+            await interaction.response.send_message("This command only works in a server.", ephemeral=True)
+            return
+        if not isinstance(interaction.user, discord.Member) or not interaction.user.voice:
+            await interaction.response.send_message("Join a voice channel first.", ephemeral=True)
+            return
+        if not LEAVE_STYLE_SONG.is_file():
+            await interaction.response.send_message("The leave-in-style song file is missing.", ephemeral=True)
+            return
+
+        bot_member = interaction.guild.me
+        if bot_member is None or not bot_member.guild_permissions.move_members:
+            await interaction.response.send_message(
+                "I need the Move Members permission to clear the voice channel.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer()
+
+        old_task = self.leave_style_tasks.pop(interaction.guild.id, None)
+        if old_task and not old_task.done():
+            old_task.cancel()
+
+        try:
+            channel = interaction.user.voice.channel
+            voice_client = interaction.guild.voice_client
+            if voice_client and voice_client.is_connected():
+                if voice_client.channel != channel:
+                    await voice_client.move_to(channel)
+            else:
+                voice_client = await channel.connect()
+
+            voice_client.play(
+                discord.FFmpegPCMAudio(str(LEAVE_STYLE_SONG), executable=config.FFMPEG_EXECUTABLE)
+            )
+            self.leave_style_tasks[interaction.guild.id] = asyncio.create_task(
+                self._clear_voice_channel(interaction.guild, channel, voice_client)
+            )
+            await interaction.followup.send("Leave-in-style sequence started.")
+        except (discord.ClientException, discord.Forbidden, discord.HTTPException, OSError) as error:
+            if getattr(self.bot, "debug_mode", False):
+                print(f"[DEBUG] Leave-in-style failed: {error}")
+            await interaction.followup.send(
+                "I could not start the leave-in-style sequence. Check that FFmpeg and voice permissions are available.",
+                ephemeral=True,
+            )
+
+    async def _clear_voice_channel(self, guild: discord.Guild, channel: discord.VoiceChannel, voice_client):
+        try:
+            await asyncio.sleep(max(0, config.LEAVE_STYLE_DROP_SECONDS))
+            for member in list(channel.members):
+                if member.id == self.bot.user.id:
+                    continue
+                try:
+                    await member.move_to(None, reason="Leave-in-style prank")
+                except (discord.Forbidden, discord.HTTPException) as error:
+                    if getattr(self.bot, "debug_mode", False):
+                        print(f"[DEBUG] Could not disconnect {member.id}: {error}")
+            if voice_client.is_connected():
+                await voice_client.disconnect()
+        except asyncio.CancelledError:
+            if voice_client.is_playing():
+                voice_client.stop()
+            raise
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):

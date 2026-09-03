@@ -83,6 +83,11 @@ a 25% chance of being deleted. Run `/textprank` again to turn it off. The bot
 needs the Manage Messages permission, and the confirmation does not mention or
 ping the selected member.
 
+Use `/leaveinstyle` to play `Sounds/outro-song_oqu8zAg.mp3`. After 15.3 seconds
+by default, the bot disconnects members from that voice channel and then leaves.
+Set `LEAVE_STYLE_DROP_SECONDS` in `.env` to match the song's beat drop. The bot
+requires Connect, Speak, and Move Members permissions.
+
 ## Adding a new feature (cog)
 
 1. Create a new file in `bot/cogs/`, e.g. `bot/cogs/moderation.py`

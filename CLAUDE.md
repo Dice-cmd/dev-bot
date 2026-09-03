@@ -17,6 +17,7 @@ As of 2026-09-02, the bot is a small dev/test bot with working slash commands fo
 - `/sound` for playing a server soundboard sound
 - `/autoprank user:@member sound_1:<sound> sound_2:<sound> sound_3:<sound>` for targeted random sound reactions
 - `/textprank user:@member` for targeted message deletion with a 25% chance
+- `/leaveinstyle` to play the leave song and disconnect voice members at the configured drop time
 
 The bot also includes debug logging for voice state changes when debug mode is enabled.
 
@@ -55,6 +56,10 @@ guild.
 
 `/textprank` targets one selected member and deletes their messages with a 25%
 chance. It requires the bot to have Manage Messages permission.
+
+`/leaveinstyle` plays `Sounds/outro-song_oqu8zAg.mp3`, disconnects members at
+`LEAVE_STYLE_DROP_SECONDS`, and then leaves the voice channel. It requires Move
+Members permission.
 
 ## Debug mode
 The bot has an owner-only `/debug` command that toggles a debug flag.
