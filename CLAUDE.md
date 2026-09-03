@@ -14,6 +14,9 @@ As of 2026-09-02, the bot is a small dev/test bot with working slash commands fo
 - `/leave`
 - `/debug` (owner only)
 - `/reload` (owner only)
+- `/sound` for playing a server soundboard sound
+- `/autoprank user:@member sound_1:<sound> sound_2:<sound> sound_3:<sound>` for targeted random sound reactions
+- `/textprank user:@member` for targeted message deletion with a 25% chance
 
 The bot also includes debug logging for voice state changes when debug mode is enabled.
 
@@ -43,6 +46,15 @@ The bot supports basic voice join/leave behavior.
 - `/join`: joins the user's current voice channel
 - `/leave`: leaves whatever voice channel the bot is in
 - `on_voice_state_update` logs join/leave events to the terminal when debug mode is enabled
+
+The voice prank cog fetches built-in and server soundboard sounds and plays the
+selected clip with `/sound` through Discord's native soundboard API. `/autoprank`
+uses DAVE-compatible voice receiving to detect speaking starts for one selected
+member and trigger a random built-in sound at most once every 1 second per
+guild.
+
+`/textprank` targets one selected member and deletes their messages with a 25%
+chance. It requires the bot to have Manage Messages permission.
 
 ## Debug mode
 The bot has an owner-only `/debug` command that toggles a debug flag.

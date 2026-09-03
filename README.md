@@ -12,7 +12,8 @@ discord-bot/
 │   ├── config.py       # reads settings from .env
 │   └── cogs/
 │       ├── general.py  # example commands: /ping, /uptime, /info
-│       └── admin.py    # owner-only /reload for fast dev iteration
+│       ├── admin.py    # owner-only /reload for fast dev iteration
+│       └── voice_prank.py # soundboard and prank modes
 ├── .env.example         # copy to .env and fill in
 ├── .gitignore
 ├── requirements.txt
@@ -60,6 +61,27 @@ discord-bot/
    ```bash
    python -m bot.main
    ```
+
+## Voice prank
+
+In a voice channel, use `/sound` and choose one of Discord's built-in sounds or
+a sound uploaded to that server. The bot sends the sound through Discord's
+native soundboard API, so FFmpeg is not needed for this feature. It needs Speak
+and Use Soundboard permissions, and the person using the command must be in a
+voice channel.
+
+Use `/autoprank user:@member` to turn on automatic reactions for one selected
+member. Optionally choose `sound_1`, `sound_2`, and `sound_3`; one of those is
+picked randomly each time. Leave them blank to use all available built-in
+sounds. The bot ignores everyone else and observes the current cooldown before
+reacting again. The confirmation uses plain text and does not mention or ping
+the selected member. Run `/autoprank` again to turn it off. Voice receiving also
+requires the DAVE-compatible dependency listed in `requirements.txt`.
+
+Use `/textprank user:@member` to target one member's messages. Each message has
+a 25% chance of being deleted. Run `/textprank` again to turn it off. The bot
+needs the Manage Messages permission, and the confirmation does not mention or
+ping the selected member.
 
 ## Adding a new feature (cog)
 

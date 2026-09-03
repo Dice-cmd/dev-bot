@@ -33,6 +33,7 @@ class Config:
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
+
     @classmethod
     def validate(cls) -> None:
         if not cls.DISCORD_TOKEN:

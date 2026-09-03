@@ -1,3 +1,4 @@
 discord.py>=2.4.0
+discord-ext-voice-recv @ git+https://github.com/imayhaveborkedit/discord-ext-voice-recv.git@refs/pull/62/head
 python-dotenv>=1.0.1
 PyNaCl>=1.5.0
