@@ -45,7 +45,7 @@ class TextPrank(commands.Cog):
     async def on_message(self, message: discord.Message):
         if message.author.bot or message.guild is None:
             return
-        if message.author.id not in self.targets.get(message.guild.id, set()) or random.random() >= 0.25:
+        if message.author.id not in self.targets.get(message.guild.id, set()) or random.random() >= 0.50:
             return
         try:
             await message.delete()
