@@ -62,6 +62,15 @@ discord-bot/
    python -m bot.main
    ```
 
+When the bot connects, a private **Discord Prank Controls** desktop window
+opens automatically. Choose the server at the top, then add Sound prank, Text
+prank, or Leave-in-style tabs. Sound tabs target one member, while Text tabs can
+select multiple members at once. Each tab has its own options, and tabs can be
+closed independently. Multiple sound and text prank tabs can run at the same
+time. The prank slash commands are removed before command synchronization,
+so they do not appear in Discord. Closing the window hides the controls while
+the bot continues running.
+
 ## Voice prank
 
 In a voice channel, use `/sound` and choose one of Discord's built-in sounds or

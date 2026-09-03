@@ -48,6 +48,9 @@ class MyBot(commands.Bot):
                 log.exception("Failed to load cog: %s", extension)
 
     async def sync_commands(self):
+        hidden_commands = {"sound", "autoprank", "textprank", "leaveinstyle"}
+        for command_name in hidden_commands:
+            self.tree.remove_command(command_name)
         if config.DEV_GUILD_IDS:
             # Instant sync to specific dev servers — use this while building.
             for guild_id in config.DEV_GUILD_IDS:
@@ -62,6 +65,11 @@ class MyBot(commands.Bot):
     async def on_ready(self):
         log.info("Logged in as %s (ID: %s)", self.user, self.user.id)
         log.info("Connected to %d guild(s)", len(self.guilds))
+        if not getattr(self, "control_panel_started", False):
+            from bot.control_panel import ControlPanel
+
+            self.control_panel_started = True
+            ControlPanel(self).start()
 
 
 async def main():

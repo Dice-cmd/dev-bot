@@ -17,12 +17,11 @@ LEAVE_STYLE_SONG = Path(__file__).parents[2] / "Sounds" / "outro-song_oqu8zAg.mp
 
 
 class AutoPrankSink(voice_recv.AudioSink):
-    def __init__(self, bot: commands.Bot, channel_id: int, target_user_id: int, sounds: list[tuple[int, str, int | None]]):
+    def __init__(self, bot: commands.Bot, channel_id: int):
         super().__init__()
         self.bot = bot
         self.channel_id = channel_id
-        self.target_user_id = target_user_id
-        self.sounds = sounds
+        self.target_sounds: dict[int, list[tuple[int, str, int | None]]] = {}
         self.loop = bot.loop
         self.next_allowed = 0.0
         self.cooldown_lock = threading.Lock()
@@ -35,7 +34,7 @@ class AutoPrankSink(voice_recv.AudioSink):
 
     @voice_recv.AudioSink.listener()
     def on_voice_member_speaking_start(self, member: discord.Member):
-        if member.bot or member.id != self.target_user_id:
+        if member.bot or member.id not in self.target_sounds:
             return
 
         with self.cooldown_lock:
@@ -44,7 +43,7 @@ class AutoPrankSink(voice_recv.AudioSink):
                 return
             self.next_allowed = now + 1
 
-        sound_id, sound_name, source_guild_id = random.choice(self.sounds)
+        sound_id, sound_name, source_guild_id = random.choice(self.target_sounds[member.id])
         future = asyncio.run_coroutine_threadsafe(
             self._play_sound(sound_id, source_guild_id),
             self.loop,
@@ -69,13 +68,132 @@ class AutoPrankSink(voice_recv.AudioSink):
     def cleanup(self):
         pass
 
+    def add_target(self, user_id: int, sounds: list[tuple[int, str, int | None]]):
+        self.target_sounds[user_id] = sounds
+
+    def remove_target(self, user_id: int):
+        self.target_sounds.pop(user_id, None)
+
 
 class VoicePrank(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.auto_sessions: dict[int, AutoPrankSink] = {}
-        self.text_prank_targets: dict[int, int] = {}
+        self.text_prank_targets: dict[int, set[int]] = {}
         self.leave_style_tasks: dict[int, asyncio.Task] = {}
+
+    async def gui_get_sounds(self, guild: discord.Guild):
+        sounds = await self._get_sounds_from_guild(guild)
+        return [
+            (item.id, item.name, item.guild.id if isinstance(item, discord.SoundboardSound) else None)
+            for item in sounds
+        ]
+
+    async def gui_play_sound(self, guild: discord.Guild, sound_id: int):
+        channel = self._gui_voice_channel(guild)
+        if channel is None:
+            raise RuntimeError("The bot or target member must be in a voice channel")
+        sounds = await self._get_sounds_from_guild(guild)
+        selected = next((item for item in sounds if item.id == sound_id), None)
+        if selected is None:
+            raise RuntimeError("That sound is no longer available")
+        payload = {"sound_id": selected.id}
+        if isinstance(selected, discord.SoundboardSound):
+            payload["source_guild_id"] = selected.guild.id
+        await self.bot.http.send_soundboard_sound(channel.id, **payload)
+
+    async def gui_toggle_autoprank(self, guild: discord.Guild, target: discord.Member, sound_ids: list[int]):
+        channel = target.voice.channel if target.voice else None
+        if channel is None:
+            raise RuntimeError("The target member must be in a voice channel")
+        sounds = await self._get_sounds_from_guild(guild)
+        available = {item.id: item for item in sounds}
+        selected = [available[sound_id] for sound_id in sound_ids if sound_id in available]
+        if sound_ids and len(selected) != len(sound_ids):
+            raise RuntimeError("One of the selected sounds is no longer available")
+        sounds_to_play = selected or [item for item in sounds if isinstance(item, discord.SoundboardDefaultSound)]
+        if not sounds_to_play:
+            raise RuntimeError("No built-in Discord sounds are available")
+
+        voice_client = guild.voice_client
+        sink = self.auto_sessions.get(guild.id)
+        if sink and target.id in sink.target_sounds:
+            sink.remove_target(target.id)
+            if not sink.target_sounds:
+                self.auto_sessions.pop(guild.id, None)
+                if isinstance(voice_client, voice_recv.VoiceRecvClient):
+                    voice_client.stop_listening()
+                    await voice_client.disconnect()
+            return f"Automatic sound reactions are now off for {target.display_name}."
+        if voice_client and voice_client.is_connected() and voice_client.channel != channel:
+            raise RuntimeError("All automatic voice prank targets must be in the same voice channel")
+        if not voice_client or not voice_client.is_connected():
+            voice_client = await channel.connect(cls=voice_recv.VoiceRecvClient)
+            sink = AutoPrankSink(self.bot, channel.id)
+            self.auto_sessions[guild.id] = sink
+            voice_client.listen(sink)
+        sink.add_target(target.id, [
+            (item.id, item.name, item.guild.id if isinstance(item, discord.SoundboardSound) else None)
+            for item in sounds_to_play
+        ])
+        return f"Automatic sound reactions are now on for {target.display_name}."
+
+    async def gui_toggle_textprank(self, guild: discord.Guild, target: discord.Member):
+        targets = self.text_prank_targets.setdefault(guild.id, set())
+        if target.id in targets:
+            targets.remove(target.id)
+            if not targets:
+                self.text_prank_targets.pop(guild.id)
+            return "Text prank mode is now off."
+        bot_member = guild.me
+        if bot_member is None or not bot_member.guild_permissions.manage_messages:
+            raise RuntimeError("The bot needs Manage Messages permission")
+        targets.add(target.id)
+        return f"Text prank mode is now on for {target.display_name}."
+
+    async def gui_toggle_textprank_many(self, guild: discord.Guild, targets: list[discord.Member]):
+        bot_member = guild.me
+        if bot_member is None or not bot_member.guild_permissions.manage_messages:
+            raise RuntimeError("The bot needs Manage Messages permission")
+        target_ids = {target.id for target in targets}
+        active_targets = self.text_prank_targets.setdefault(guild.id, set())
+        if target_ids.issubset(active_targets):
+            active_targets.difference_update(target_ids)
+            if not active_targets:
+                self.text_prank_targets.pop(guild.id)
+            return f"Text prank mode is now off for {len(targets)} selected members."
+        active_targets.update(target_ids)
+        names = ", ".join(target.display_name for target in targets)
+        return f"Text prank mode is now on for: {names}."
+
+    async def gui_leaveinstyle(self, guild: discord.Guild, target: discord.Member):
+        if not LEAVE_STYLE_SONG.is_file():
+            raise RuntimeError("The leave-in-style song file is missing")
+        bot_member = guild.me
+        if bot_member is None or not bot_member.guild_permissions.move_members:
+            raise RuntimeError("The bot needs Move Members permission")
+        channel = target.voice.channel if target.voice else self._gui_voice_channel(guild)
+        if channel is None:
+            raise RuntimeError("The selected member must be in a voice channel")
+        voice_client = guild.voice_client
+        if not voice_client or not voice_client.is_connected():
+            voice_client = await channel.connect()
+        elif voice_client.channel != channel:
+            await voice_client.move_to(channel)
+        if voice_client.is_playing():
+            voice_client.stop()
+        voice_client.play(discord.FFmpegPCMAudio(str(LEAVE_STYLE_SONG), executable=config.FFMPEG_EXECUTABLE))
+        old_task = self.leave_style_tasks.pop(guild.id, None)
+        if old_task and not old_task.done():
+            old_task.cancel()
+        self.leave_style_tasks[guild.id] = asyncio.create_task(
+            self._clear_voice_channel(guild, channel, voice_client)
+        )
+        return "Leave-in-style sequence started."
+
+    @staticmethod
+    def _gui_voice_channel(guild: discord.Guild):
+        return guild.me.voice.channel if guild.me and guild.me.voice else None
 
     @app_commands.command(name="sound", description="Play a sound from this server's soundboard")
     @app_commands.describe(sound="Choose a soundboard sound")
@@ -166,21 +284,20 @@ class VoicePrank(commands.Cog):
         sounds_to_play = selected_sounds or default_sounds
 
         voice_client = interaction.guild.voice_client
-        if voice_client and voice_client.is_connected():
-            await voice_client.disconnect()
         channel = interaction.user.voice.channel
-        voice_client = await channel.connect(cls=voice_recv.VoiceRecvClient)
-        sink = AutoPrankSink(
-            self.bot,
-            channel.id,
-            user.id,
-            [
-                (item.id, item.name, item.guild.id if isinstance(item, discord.SoundboardSound) else None)
-                for item in sounds_to_play
-            ],
-        )
-        self.auto_sessions[guild_id] = sink
-        voice_client.listen(sink)
+        sink = self.auto_sessions.get(guild_id)
+        if voice_client and voice_client.is_connected() and voice_client.channel != channel:
+            await interaction.response.send_message("The bot is already listening in another voice channel.", ephemeral=True)
+            return
+        if not voice_client or not voice_client.is_connected():
+            voice_client = await channel.connect(cls=voice_recv.VoiceRecvClient)
+            sink = AutoPrankSink(self.bot, channel.id)
+            self.auto_sessions[guild_id] = sink
+            voice_client.listen(sink)
+        sink.add_target(user.id, [
+            (item.id, item.name, item.guild.id if isinstance(item, discord.SoundboardSound) else None)
+            for item in sounds_to_play
+        ])
         await interaction.response.send_message(
             f"Automatic sound reactions are now on for {user.display_name} (ID: {user.id})."
         )
@@ -193,8 +310,11 @@ class VoicePrank(commands.Cog):
             return
 
         guild_id = interaction.guild.id
-        if guild_id in self.text_prank_targets:
-            self.text_prank_targets.pop(guild_id)
+        targets = self.text_prank_targets.setdefault(guild_id, set())
+        if user.id in targets:
+            targets.remove(user.id)
+            if not targets:
+                self.text_prank_targets.pop(guild_id)
             await interaction.response.send_message("Text prank mode is now off.")
             return
 
@@ -213,7 +333,7 @@ class VoicePrank(commands.Cog):
             )
             return
 
-        self.text_prank_targets[guild_id] = user.id
+        targets.add(user.id)
         await interaction.response.send_message(
             f"Text prank mode is now on for {user.display_name} (ID: {user.id})."
         )
@@ -290,7 +410,7 @@ class VoicePrank(commands.Cog):
     async def on_message(self, message: discord.Message):
         if message.author.bot or message.guild is None:
             return
-        if self.text_prank_targets.get(message.guild.id) != message.author.id:
+        if message.author.id not in self.text_prank_targets.get(message.guild.id, set()):
             return
         if random.random() >= 0.25:
             return
@@ -326,12 +446,15 @@ class VoicePrank(commands.Cog):
         return await self.sound_autocomplete(interaction, current)
 
     async def _get_sounds(self, interaction: discord.Interaction):
-        default_data = await interaction.client.http.get_soundboard_default_sounds()
+        return await self._get_sounds_from_guild(interaction.guild)
+
+    async def _get_sounds_from_guild(self, guild: discord.Guild):
+        default_data = await self.bot.http.get_soundboard_default_sounds()
         default_sounds = [
-            discord.SoundboardDefaultSound(state=interaction.client._connection, data=item)
+            discord.SoundboardDefaultSound(state=self.bot._connection, data=item)
             for item in default_data
         ]
-        guild_sounds = await interaction.guild.fetch_soundboard_sounds()
+        guild_sounds = await guild.fetch_soundboard_sounds()
         return default_sounds + guild_sounds
 
 
