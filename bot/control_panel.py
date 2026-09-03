@@ -105,12 +105,13 @@ class ControlPanel:
 
     def _close_tab(self, tab, tab_data, forget=True):
         guild = tab_data["guild"]
-        cog = self.bot.get_cog("VoicePrank")
+        sound_cog = self.bot.get_cog("SoundPrank")
+        text_cog = self.bot.get_cog("TextPrank")
         if tab_data.get("mode") == "sound" and tab_data.get("active") and tab_data.get("target"):
-            self._run_async(cog.gui_toggle_autoprank(guild, tab_data["target"], tab_data.get("sound_ids", [])))
+            self._run_async(sound_cog.gui_toggle_autoprank(guild, tab_data["target"], tab_data.get("sound_ids", [])))
         elif tab_data.get("mode") == "text" and tab_data.get("active"):
             for target in tab_data.get("targets", []):
-                self._run_async(cog.gui_toggle_textprank(guild, target))
+                self._run_async(text_cog.gui_toggle(guild, [target]))
         if forget:
             self.tab_data.pop(str(tab), None)
             self.notebook.forget(tab)
@@ -131,7 +132,7 @@ class ControlPanel:
             sound_list = tk.Listbox(tab, selectmode=tk.MULTIPLE, height=14, exportselection=False)
             sound_list.pack(fill="both", expand=True, pady=(4, 14))
             tab_data["sound_list"] = sound_list
-            self._run_async(self.bot.get_cog("VoicePrank").gui_get_sounds(tab_data["guild"]), lambda sounds: self._fill_sound_list(tab_data, sounds))
+            self._run_async(self.bot.get_cog("SoundPrank").gui_get_sounds(tab_data["guild"]), lambda sounds: self._fill_sound_list(tab_data, sounds))
             ttk.Button(tab, text="Play selected sound", command=lambda: self._play_selected(tab_data)).pack(fill="x", pady=2)
             ttk.Button(tab, text="Toggle sound prank", command=lambda: self._toggle_sound(tab_data)).pack(fill="x", pady=2)
         else:
@@ -176,7 +177,7 @@ class ControlPanel:
             self._set_status("Choose a target and sound")
             return
         sound_id = tab_data["sounds"][selected[0]][0]
-        self._run_async(self.bot.get_cog("VoicePrank").gui_play_sound(tab_data["guild"], sound_id), lambda _: self._set_status("Sound played"))
+        self._run_async(self.bot.get_cog("SoundPrank").gui_play_sound(tab_data["guild"], sound_id), lambda _: self._set_status("Sound played"))
 
     def _toggle_sound(self, tab_data):
         target = self._selected_target(tab_data)
@@ -185,7 +186,7 @@ class ControlPanel:
             tab_data["target"] = target
             tab_data["sound_ids"] = sound_ids
             self._run_async(
-                self.bot.get_cog("VoicePrank").gui_toggle_autoprank(tab_data["guild"], target, sound_ids),
+                self.bot.get_cog("SoundPrank").gui_toggle_autoprank(tab_data["guild"], target, sound_ids),
                 lambda value: self._mark_active(tab_data, value),
             )
 
@@ -198,7 +199,7 @@ class ControlPanel:
         tab_data["target"] = targets[0]
         tab_data["targets"] = targets
         self._run_async(
-            self.bot.get_cog("VoicePrank").gui_toggle_textprank_many(tab_data["guild"], targets),
+            self.bot.get_cog("TextPrank").gui_toggle(tab_data["guild"], targets),
             lambda value: self._mark_active(tab_data, value),
         )
 
@@ -214,7 +215,7 @@ class ControlPanel:
         )
         if confirmed:
             self._run_async(
-                self.bot.get_cog("VoicePrank").gui_leaveinstyle(tab_data["guild"], target),
+                self.bot.get_cog("LeaveStyle").gui_start(tab_data["guild"], target),
                 self._set_status,
             )
 

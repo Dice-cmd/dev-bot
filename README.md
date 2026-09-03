@@ -13,7 +13,10 @@ discord-bot/
 │   └── cogs/
 │       ├── general.py  # example commands: /ping, /uptime, /info
 │       ├── admin.py    # owner-only /reload for fast dev iteration
-│       └── voice_prank.py # soundboard and prank modes
+│       ├── sound_prank.py # soundboard and automatic sound reactions
+│       ├── text_prank.py  # targeted message deletion
+│       └── leave_style.py # timed voice-channel clear
+├── bot/control_panel.py   # private local Tkinter GUI
 ├── .env.example         # copy to .env and fill in
 ├── .gitignore
 ├── requirements.txt

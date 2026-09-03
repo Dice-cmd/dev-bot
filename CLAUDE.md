@@ -34,6 +34,12 @@ The bot also includes debug logging for voice state changes when debug mode is e
   - user-facing slash commands such as ping/info/join/leave
 - `bot/cogs/admin.py`
   - owner-only tools such as `/reload` and `/debug`
+- `bot/cogs/sound_prank.py`
+  - soundboard playback and targeted automatic sound reactions
+- `bot/cogs/text_prank.py`
+  - targeted message deletion
+- `bot/cogs/leave_style.py`
+  - timed song playback and voice-channel clearing
 - `bot/control_panel.py`
   - local tabbed desktop controls for the prank features
 
