@@ -9,6 +9,7 @@ instead of .env.
 """
 
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,6 +18,17 @@ load_dotenv()
 def _get_int_list(env_var: str) -> list[int]:
     raw = os.getenv(env_var, "")
     return [int(x) for x in raw.split(",") if x.strip().isdigit()]
+
+
+def _find_ffmpeg() -> str:
+    configured = os.getenv("FFMPEG_EXECUTABLE", "").strip()
+    if configured:
+        return configured
+
+    local_app_data = os.getenv("LOCALAPPDATA", "")
+    winget_root = Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
+    matches = list(winget_root.glob("**/ffmpeg.exe"))
+    return str(matches[0]) if matches else "ffmpeg"
 
 
 class Config:
@@ -32,6 +44,11 @@ class Config:
 
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+
+    # Seconds into the leave-in-style song before disconnecting voice members.
+    LEAVE_STYLE_DROP_SECONDS: float = float(os.getenv("LEAVE_STYLE_DROP_SECONDS", "15.3"))
+
+    FFMPEG_EXECUTABLE: str = _find_ffmpeg()
 
 
     @classmethod

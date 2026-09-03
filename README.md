@@ -13,7 +13,10 @@ discord-bot/
 │   └── cogs/
 │       ├── general.py  # example commands: /ping, /uptime, /info
 │       ├── admin.py    # owner-only /reload for fast dev iteration
-│       └── voice_prank.py # soundboard and prank modes
+│       ├── sound_prank.py # soundboard and automatic sound reactions
+│       ├── text_prank.py  # targeted message deletion
+│       └── leave_style.py # timed voice-channel clear
+├── bot/control_panel.py   # private local Tkinter GUI
 ├── .env.example         # copy to .env and fill in
 ├── .gitignore
 ├── requirements.txt
@@ -62,6 +65,15 @@ discord-bot/
    python -m bot.main
    ```
 
+When the bot connects, a private **Discord Prank Controls** desktop window
+opens automatically. Choose the server at the top, then add Sound prank, Text
+prank, or Leave-in-style tabs. Sound tabs target one member, while Text tabs can
+select multiple members at once. Each tab has its own options, and tabs can be
+closed independently. Multiple sound and text prank tabs can run at the same
+time. The prank slash commands are removed before command synchronization,
+so they do not appear in Discord. Closing the window hides the controls while
+the bot continues running.
+
 ## Voice prank
 
 In a voice channel, use `/sound` and choose one of Discord's built-in sounds or
@@ -82,6 +94,11 @@ Use `/textprank user:@member` to target one member's messages. Each message has
 a 25% chance of being deleted. Run `/textprank` again to turn it off. The bot
 needs the Manage Messages permission, and the confirmation does not mention or
 ping the selected member.
+
+Use `/leaveinstyle` to play `Sounds/outro-song_oqu8zAg.mp3`. After 15.3 seconds
+by default, the bot disconnects members from that voice channel and then leaves.
+Set `LEAVE_STYLE_DROP_SECONDS` in `.env` to match the song's beat drop. The bot
+requires Connect, Speak, and Move Members permissions.
 
 ## Adding a new feature (cog)
 

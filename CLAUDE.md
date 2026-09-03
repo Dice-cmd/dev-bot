@@ -3,7 +3,7 @@
 ## Project overview
 This repository is a Python Discord bot built with discord.py and organized around cog-based features.
 
-The bot entry point is `bot/main.py`. It loads extension modules from `bot/cogs/*.py` automatically and syncs slash commands to Discord on startup.
+The bot entry point is `bot/main.py`. It loads extension modules from `bot/cogs/*.py` automatically and syncs slash commands to Discord on startup. After login it starts the local Tkinter control panel in `bot/control_panel.py`.
 
 ## Current project status
 As of 2026-09-02, the bot is a small dev/test bot with working slash commands for:
@@ -17,6 +17,7 @@ As of 2026-09-02, the bot is a small dev/test bot with working slash commands fo
 - `/sound` for playing a server soundboard sound
 - `/autoprank user:@member sound_1:<sound> sound_2:<sound> sound_3:<sound>` for targeted random sound reactions
 - `/textprank user:@member` for targeted message deletion with a 25% chance
+- `/leaveinstyle` to play the leave song and disconnect voice members at the configured drop time
 
 The bot also includes debug logging for voice state changes when debug mode is enabled.
 
@@ -33,6 +34,14 @@ The bot also includes debug logging for voice state changes when debug mode is e
   - user-facing slash commands such as ping/info/join/leave
 - `bot/cogs/admin.py`
   - owner-only tools such as `/reload` and `/debug`
+- `bot/cogs/sound_prank.py`
+  - soundboard playback and targeted automatic sound reactions
+- `bot/cogs/text_prank.py`
+  - targeted message deletion
+- `bot/cogs/leave_style.py`
+  - timed song playback and voice-channel clearing
+- `bot/control_panel.py`
+  - local tabbed desktop controls for the prank features
 
 ## Runtime behavior
 - Bot startup command:
@@ -56,6 +65,13 @@ guild.
 `/textprank` targets one selected member and deletes their messages with a 25%
 chance. It requires the bot to have Manage Messages permission.
 
+The local control panel supports multiple simultaneous sound and text prank
+targets using independent tabs. Text tabs can select multiple members at once.
+
+`/leaveinstyle` plays `Sounds/outro-song_oqu8zAg.mp3`, disconnects members at
+`LEAVE_STYLE_DROP_SECONDS`, and then leaves the voice channel. It requires Move
+Members permission.
+
 ## Debug mode
 The bot has an owner-only `/debug` command that toggles a debug flag.
 
@@ -73,6 +89,7 @@ Voice features require the voice libraries to be installed in the same Python en
 
 ## Important notes for future AI agents
 - Keep command features in separate cog files inside `bot/cogs/`.
+- The prank slash commands are hidden from Discord; control them from the local GUI.
 - Do not put feature logic directly in `bot/main.py` unless it is truly shared/global setup.
 - When editing slash commands, restart the bot so Discord re-syncs command definitions.
 - If duplicate slash commands appear in Discord, stale app-command registrations are usually the cause. The common fix is to use a clean test guild or re-invite the bot after removing stale commands.
