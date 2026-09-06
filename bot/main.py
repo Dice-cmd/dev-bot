@@ -1,10 +1,14 @@
 """
-Entry point. Run with: python -m bot.main
+Entry point.
+
+Run the normal bot with: python -m bot.main
+Run the bot with the prank control panel with: python -m bot.main prank
 """
 
 import asyncio
 import logging
 from pathlib import Path
+import sys
 
 import discord
 from discord.ext import commands
@@ -21,7 +25,8 @@ COGS_DIR = Path(__file__).parent / "cogs"
 
 
 class MyBot(commands.Bot):
-    def __init__(self):
+    def __init__(self, prank_mode: bool = False):
+        self.prank_mode = prank_mode
         intents = discord.Intents.default()
         intents.message_content = True  # needed if you add prefix commands later
         intents.members = True  # needed for member join/leave events, roles, etc.
@@ -65,7 +70,7 @@ class MyBot(commands.Bot):
     async def on_ready(self):
         log.info("Logged in as %s (ID: %s)", self.user, self.user.id)
         log.info("Connected to %d guild(s)", len(self.guilds))
-        if not getattr(self, "control_panel_started", False):
+        if self.prank_mode and not getattr(self, "control_panel_started", False):
             from bot.control_panel import ControlPanel
 
             self.control_panel_started = True
@@ -74,7 +79,8 @@ class MyBot(commands.Bot):
 
 async def main():
     config.validate()
-    bot = MyBot()
+    prank_mode = sys.argv[1:] == ["prank"]
+    bot = MyBot(prank_mode=prank_mode)
     async with bot:
         await bot.start(config.DISCORD_TOKEN)
 
